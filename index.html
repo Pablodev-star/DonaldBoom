@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>El Botón del Poder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Press Start 2P', monospace;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #ui-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 10px 16px;
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 60%, transparent 100%);
+  }
+  .game-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    padding: 10px 14px;
+    border: 3px solid;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: transform 0.1s, box-shadow 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    image-rendering: pixelated;
+  }
+  .game-btn::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+  .game-btn:active { transform: scale(0.93) translateY(2px); }
+  #btn-switch {
+    background: #0a1628;
+    color: #00ff88;
+    border-color: #00ff88;
+    box-shadow: 0 0 8px rgba(0,255,136,0.2), inset 0 0 12px rgba(0,255,136,0.05);
+  }
+  #btn-switch::after { background: #006633; }
+  #btn-switch:hover { box-shadow: 0 0 16px rgba(0,255,136,0.4), inset 0 0 20px rgba(0,255,136,0.1); }
+  #btn-switch.bombs {
+    background: #28090a;
+    color: #ff4444;
+    border-color: #ff4444;
+    box-shadow: 0 0 8px rgba(255,68,68,0.2), inset 0 0 12px rgba(255,68,68,0.05);
+  }
+  #btn-switch.bombs::after { background: #661a1a; }
+  #btn-amount {
+    background: #1a1808;
+    color: #ffdd44;
+    border-color: #ffdd44;
+    box-shadow: 0 0 8px rgba(255,221,68,0.2), inset 0 0 12px rgba(255,221,68,0.05);
+  }
+  #btn-amount::after { background: #665500; }
+  #btn-launch {
+    background: linear-gradient(180deg, #dd1111 0%, #880000 100%);
+    color: #fff;
+    border-color: #ff4444;
+    font-size: 11px;
+    padding: 12px 20px;
+    box-shadow: 0 0 20px rgba(255,0,0,0.4), 0 4px 0 #550000;
+    animation: pulse-red 1.5s infinite;
+    text-shadow: 0 0 6px rgba(255,255,255,0.5);
+  }
+  #btn-launch::after { background: #550000; }
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,0,0,0.3), 0 4px 0 #550000; }
+    50% { box-shadow: 0 0 40px rgba(255,0,0,0.7), 0 4px 0 #550000; }
+  }
+  #intro-screen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  #intro-screen canvas { position: absolute; inset: 0; z-index: 0; }
+  #intro-screen h1 {
+    font-family: 'Press Start 2P', monospace;
+    color: #ff4444;
+    font-size: clamp(16px, 4vw, 32px);
+    text-align: center;
+    text-shadow: 0 0 30px rgba(255,0,0,0.5), 0 4px 0 #880000;
+    margin-bottom: 30px;
+    line-height: 1.6;
+    z-index: 1;
+    animation: title-glow 2s ease-in-out infinite;
+  }
+  @keyframes title-glow {
+    0%, 100% { text-shadow: 0 0 30px rgba(255,0,0,0.5), 0 4px 0 #880000; filter: brightness(1); }
+    50% { text-shadow: 0 0 50px rgba(255,0,0,0.8), 0 0 80px rgba(255,50,0,0.3), 0 4px 0 #880000; filter: brightness(1.1); }
+  }
+  #intro-screen .subtitle {
+    font-family: 'Press Start 2P', monospace;
+    color: #c8a432;
+    font-size: clamp(6px, 1.5vw, 10px);
+    margin-bottom: 40px;
+    z-index: 1;
+    letter-spacing: 4px;
+  }
+  #intro-screen p {
+    font-family: 'Press Start 2P', monospace;
+    color: #888;
+    font-size: clamp(8px, 2vw, 12px);
+    animation: blink 1.2s infinite;
+    z-index: 1;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+  #score-display {
+    position: fixed;
+    top: 8px;
+    right: 10px;
+    z-index: 100;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    text-align: right;
+    line-height: 2.2;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 10px;
+    border: 2px solid rgba(255,255,255,0.08);
+  }
+  .money-color { color: #00ff88; text-shadow: 0 0 8px rgba(0,255,136,0.4); }
+  .bomb-color { color: #ff4444; text-shadow: 0 0 8px rgba(255,68,68,0.4); }
+  #target-counter {
+    position: fixed;
+    top: 8px;
+    left: 10px;
+    z-index: 100;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #c8a432;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 10px;
+    border: 2px solid rgba(200,164,50,0.15);
+    text-shadow: 0 0 6px rgba(200,164,50,0.3);
+  }
+</style>
+</head>
+<body>
+
+<div id="intro-screen">
+  <canvas id="intro-bg"></canvas>
+  <h1>EL BOTÓN<br>DEL PODER</h1>
+  <div class="subtitle">★ SIMULADOR PRESIDENCIAL ★</div>
+  <p>[ TOCA PARA EMPEZAR ]</p>
+</div>
+
+<div id="score-display">
+  <span class="money-color">💰 $<span id="total-money">0</span>B</span><br>
+  <span class="bomb-color">⚠️ <span id="total-bombs">0</span></span>
+</div>
+
+<div id="target-counter">
+  📋 <span id="target-num">1</span>/<span id="target-total">12</span>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="ui-overlay" style="display:none;">
+  <button class="game-btn" id="btn-switch">💰 DINERO</button>
+  <button class="game-btn" id="btn-amount">1 BILLÓN</button>
+  <button class="game-btn" id="btn-launch">🔴 ENVIAR</button>
+</div>
+
+<script>
+// ============ AUDIO ENGINE ============
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx;
+function initAudio() {
+  if (!actx) actx = new AudioCtx();
+  if (actx.state === 'suspended') actx.resume();
+}
+
+function playClick() {
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'square'; o.frequency.value = 800;
+  g.gain.setValueAtTime(0.15, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.08);
+  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08);
+}
+function playCashSound() {
+  if (!actx) return;
+  [523,659,784].forEach((f,i) => {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'square'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.12, actx.currentTime + i*0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + i*0.08 + 0.15);
+    o.connect(g).connect(actx.destination);
+    o.start(actx.currentTime + i*0.08); o.stop(actx.currentTime + i*0.08 + 0.15);
+  });
+}
+function playSwitchSound() {
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(200, actx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(600, actx.currentTime + 0.1);
+  g.gain.setValueAtTime(0.15, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.15);
+  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.15);
+}
+function playImpactSound(isNuclear=false) {
+  if (!actx) return;
+  const duration = isNuclear ? 6.8 : 3.8;
+  const bufSize = Math.floor(actx.sampleRate * duration);
+  const buf = actx.createBuffer(2, bufSize, actx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < bufSize; i++) {
+      const t = i / actx.sampleRate;
+      const fade = Math.max(0, 1 - t / duration);
+      const low = Math.sin(t * (isNuclear ? 28 : 40)) * (isNuclear ? 0.8 : 0.45);
+      const noise = (Math.random() * 2 - 1) * (isNuclear ? 0.95 : 0.7);
+      d[i] = (low + noise) * fade * (isNuclear ? 0.95 : 0.75);
+    }
+  }
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(isNuclear ? 140 : 220, actx.currentTime);
+  lp.frequency.exponentialRampToValueAtTime(isNuclear ? 45 : 80, actx.currentTime + duration * 0.8);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(isNuclear ? 1.0 : 0.75, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + duration);
+  src.connect(lp).connect(g).connect(actx.destination);
+  src.start();
+
+  const siren = actx.createOscillator(), sg = actx.createGain();
+  siren.type = 'sawtooth';
+  siren.frequency.setValueAtTime(isNuclear ? 70 : 120, actx.currentTime);
+  siren.frequency.exponentialRampToValueAtTime(isNuclear ? 2800 : 1800, actx.currentTime + (isNuclear ? 2.2 : 1.5));
+  siren.frequency.exponentialRampToValueAtTime(isNuclear ? 40 : 60, actx.currentTime + duration - 0.5);
+  sg.gain.setValueAtTime(isNuclear ? 0.45 : 0.28, actx.currentTime);
+  sg.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + duration);
+  siren.connect(sg).connect(actx.destination);
+  siren.start();
+  siren.stop(actx.currentTime + duration);
+
+  const expBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * (isNuclear ? 1.2 : 0.45)), actx.sampleRate);
+  const ed = expBuf.getChannelData(0);
+  for (let i = 0; i < ed.length; i++) {
+    ed[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * (isNuclear ? 0.18 : 0.08)));
+  }
+  const expSrc = actx.createBufferSource();
+  expSrc.buffer = expBuf;
+  const eg = actx.createGain();
+  eg.gain.setValueAtTime(isNuclear ? 1.2 : 0.9, actx.currentTime + (isNuclear ? 1.0 : 0.8));
+  eg.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + (isNuclear ? 2.5 : 1.2));
+  expSrc.connect(eg).connect(actx.destination);
+  expSrc.start(actx.currentTime + (isNuclear ? 1.0 : 0.8));
+}
+
+// ============ TARGETS ============
+const targets = [
+  { name: "El Pentágono",      icon: "⭐", type: "edificio" },
+  { name: "Wall Street",       icon: "📈", type: "lugar" },
+  { name: "Silicon Valley",    icon: "💻", type: "región" },
+  { name: "La Casa Blanca",    icon: "🏛️", type: "edificio" },
+  { name: "Elon Musk",         icon: "🚀", type: "persona" },
+  { name: "Jeff Bezos",        icon: "📦", type: "persona" },
+  { name: "Mark Zuckerberg",   icon: "👤", type: "persona" },
+  { name: "Amazon",            icon: "📦", type: "empresa" },
+  { name: "Google",            icon: "🔍", type: "empresa" },
+  { name: "Meta",              icon: "🌐", type: "empresa" },
+  { name: "Tesla",             icon: "⚡", type: "empresa" },
+  { name: "Goldman Sachs",     icon: "💰", type: "banco" },
+];
+
+let state = {
+  mode: 'money', amount: 1, currentTarget: 0,
+  totalMoney: 0, totalBombs: 0, tvStatic: 0,
+  shakeX: 0, shakeY: 0, trumpAnim: 0, launched: false,
+  moneyParticles: [], decisions: [],
+  strikeActive: false, strikeTime: 0, skyRed: 0, strikeType: 'bomb',
+  time: 0,
+  dustMotes: [],
+  chandelierSwing: 0,
+};
+
+// Dust motes for atmosphere
+for (let i = 0; i < 30; i++) {
+  state.dustMotes.push({
+    x: Math.random(), y: Math.random(),
+    s: 1 + Math.random() * 2, speed: 0.0001 + Math.random() * 0.0003,
+    drift: Math.random() * Math.PI * 2
+  });
+}
+
+function shuffleTargets() {
+  for (let i = targets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [targets[i], targets[j]] = [targets[j], targets[i]];
+  }
+}
+shuffleTargets();
+
+// ============ CANVAS ============
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function drawPixelRect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+}
+function drawPixelText(text, x, y, size, color, align='center') {
+  ctx.save();
+  ctx.font = `${size}px 'Press Start 2P', monospace`;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function getWin(w, h) {
+  const cx = w * 0.78, cy = h * 0.2;
+  const ww = w * 0.14, wh = h * 0.22;
+  return { cx, cy, ww, wh, l: cx-ww/2, t: cy-wh/2, r: cx+ww/2, b: cy+wh/2 };
+}
+
+// ============ ENHANCED ROOM ============
+function drawRoom(w, h) {
+  const floorY = h * 0.62;
+
+  // Wall with subtle wallpaper pattern
+  const wallGrad = ctx.createLinearGradient(0, 0, 0, floorY);
+  wallGrad.addColorStop(0, '#141428');
+  wallGrad.addColorStop(0.5, '#1a1a32');
+  wallGrad.addColorStop(1, '#16213e');
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, 0, w, floorY);
+
+  // Wallpaper diamond pattern
+  ctx.globalAlpha = 0.04;
+  for (let gy = 0; gy < floorY; gy += 28) {
+    for (let gx = 0; gx < w; gx += 28) {
+      const off = (Math.floor(gy / 28) % 2) * 14;
+      ctx.fillStyle = '#c8a432';
+      ctx.beginPath();
+      ctx.moveTo(gx + off, gy + 14);
+      ctx.lineTo(gx + off + 7, gy);
+      ctx.lineTo(gx + off + 14, gy + 14);
+      ctx.lineTo(gx + off + 7, gy + 28);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Crown molding at ceiling
+  drawPixelRect(0, 0, w, 5, '#c8a432');
+  drawPixelRect(0, 5, w, 3, '#a08020');
+  drawPixelRect(0, 8, w, 2, '#806018');
+
+  // Wainscoting / lower wall panel
+  const panelTop = floorY - h * 0.18;
+  drawPixelRect(0, panelTop, w, 4, '#c8a432');
+  drawPixelRect(0, panelTop + 4, w, floorY - panelTop - 4, '#0f1a30');
+
+  // Panel details
+  const panelCount = Math.floor(w / 120);
+  for (let i = 0; i < panelCount; i++) {
+    const px = i * (w / panelCount) + 10;
+    const pw = (w / panelCount) - 20;
+    ctx.strokeStyle = 'rgba(200,164,50,0.12)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, panelTop + 12, pw, floorY - panelTop - 24);
+  }
+
+  // Baseboard
+  drawPixelRect(0, floorY - 8, w, 8, '#0f3460');
+  drawPixelRect(0, floorY - 10, w, 3, '#c8a432');
+
+  // Floor - wood parquet with herringbone
+  drawPixelRect(0, floorY, w, h - floorY, '#2a1a0e');
+  const tileW = w / 12;
+  const tileH = 40;
+  for (let j = 0; j < Math.ceil((h - floorY) / tileH) + 1; j++) {
+    for (let i = 0; i < 14; i++) {
+      const offX = (j % 2) * (tileW / 2);
+      const tx = i * tileW - offX;
+      const ty = floorY + j * tileH;
+      const shade = (i + j) % 3 === 0 ? '#2e1e10' : (i + j) % 3 === 1 ? '#3a2818' : '#24180a';
+      drawPixelRect(tx, ty, tileW - 1, tileH - 1, shade);
+      // Wood grain lines
+      ctx.globalAlpha = 0.08;
+      for (let g = 0; g < 3; g++) {
+        drawPixelRect(tx + 3 + g * (tileW / 4), ty + 2, 1, tileH - 4, '#c8a060');
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Floor reflection / shine
+  ctx.globalAlpha = 0.04;
+  const floorShine = ctx.createLinearGradient(0, floorY, 0, h);
+  floorShine.addColorStop(0, '#ffffff');
+  floorShine.addColorStop(0.3, 'transparent');
+  ctx.fillStyle = floorShine;
+  ctx.fillRect(0, floorY, w, h - floorY);
+  ctx.globalAlpha = 1;
+
+  // Carpet under desk area
+  const carpetL = w * 0.28, carpetR = w * 0.72;
+  const carpetY = floorY + 2;
+  ctx.fillStyle = '#1a0a2e';
+  ctx.fillRect(carpetL, carpetY, carpetR - carpetL, h * 0.25);
+  // Carpet border
+  ctx.strokeStyle = '#c8a432';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(carpetL + 4, carpetY + 4, carpetR - carpetL - 8, h * 0.25 - 8);
+  ctx.strokeRect(carpetL + 8, carpetY + 8, carpetR - carpetL - 16, h * 0.25 - 16);
+  // Carpet pattern
+  ctx.globalAlpha = 0.06;
+  for (let cy2 = carpetY + 14; cy2 < carpetY + h * 0.25 - 14; cy2 += 16) {
+    for (let cx2 = carpetL + 14; cx2 < carpetR - 14; cx2 += 16) {
+      ctx.fillStyle = '#c8a432';
+      ctx.fillRect(cx2, cy2, 4, 4);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Curtains
+  drawCurtain(w * 0.02, 10, w * 0.11, floorY - 10);
+  drawCurtain(w * 0.87, 10, w * 0.11, floorY - 10);
+
+  // Draw chandelier
+  drawChandelier(w * 0.5, 0, w);
+
+  // Draw dust motes
+  drawDustMotes(w, floorY);
+}
+
+function drawChandelier(cx, topY, roomW) {
+  const swing = Math.sin(state.time * 0.3) * 1.5;
+  const chainLen = 35;
+  
+  // Chain
+  for (let i = 0; i < chainLen; i += 4) {
+    drawPixelRect(cx + swing * (i / chainLen) - 1, topY + 10 + i, 3, 3, i % 8 < 4 ? '#c8a432' : '#a08020');
+  }
+  
+  const baseY = topY + 10 + chainLen;
+  const bx = cx + swing;
+  
+  // Main body
+  drawPixelRect(bx - 3, baseY, 6, 8, '#c8a432');
+  drawPixelRect(bx - 12, baseY + 8, 24, 4, '#c8a432');
+  
+  // Arms and candles
+  const arms = [-20, -10, 10, 20];
+  arms.forEach(ax => {
+    const armX = bx + ax;
+    drawPixelRect(Math.min(bx, armX), baseY + 9, Math.abs(ax) + 2, 2, '#a08020');
+    drawPixelRect(armX - 2, baseY + 2, 4, 8, '#c8a432');
+    // Candle
+    drawPixelRect(armX - 1, baseY - 4, 3, 7, '#f5f0d0');
+    // Flame
+    const flicker = Math.sin(state.time * 8 + ax) * 1.5;
+    const flameH = 4 + Math.sin(state.time * 12 + ax * 2) * 1.5;
+    ctx.globalAlpha = 0.6;
+    drawPixelRect(armX - 1, baseY - 4 - flameH + flicker, 3, flameH, '#ff8800');
+    ctx.globalAlpha = 0.9;
+    drawPixelRect(armX, baseY - 4 - flameH + 1 + flicker, 1, flameH - 2, '#ffee44');
+    ctx.globalAlpha = 1;
+    // Glow
+    ctx.globalAlpha = 0.06 + Math.sin(state.time * 10 + ax) * 0.02;
+    const grd = ctx.createRadialGradient(armX, baseY - 6, 0, armX, baseY - 6, 30);
+    grd.addColorStop(0, '#ffcc44');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(armX - 30, baseY - 36, 60, 60);
+    ctx.globalAlpha = 1;
+  });
+  
+  // Crystal drops
+  [-16, -6, 6, 16].forEach((dx, i) => {
+    const dy = 12 + (i % 2) * 3;
+    drawPixelRect(bx + dx, baseY + dy, 2, 5, '#aaccff');
+    ctx.globalAlpha = 0.3;
+    drawPixelRect(bx + dx, baseY + dy + 5, 2, 2, '#ffffff');
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawDustMotes(w, floorY) {
+  ctx.globalAlpha = 0.15;
+  state.dustMotes.forEach(m => {
+    m.x += Math.sin(state.time * 0.5 + m.drift) * m.speed;
+    m.y -= m.speed * 0.5;
+    if (m.y < 0) { m.y = 1; m.x = Math.random(); }
+    if (m.x < 0) m.x = 1;
+    if (m.x > 1) m.x = 0;
+    const alpha = 0.15 + Math.sin(state.time * 2 + m.drift) * 0.08;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffe8a0';
+    ctx.fillRect(m.x * w, m.y * floorY, m.s, m.s);
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawCurtain(x, y, w, h) {
+  // Curtain rod
+  drawPixelRect(x - 4, y, w + 8, 6, '#c8a432');
+  drawPixelRect(x - 6, y - 2, 8, 10, '#dab842');
+  drawPixelRect(x + w - 2, y - 2, 8, 10, '#dab842');
+
+  // Curtain folds with gradient shading
+  const foldCount = 8;
+  const foldW = w / foldCount;
+  for (let i = 0; i < foldCount; i++) {
+    const depth = Math.sin((i / foldCount) * Math.PI) * 0.3;
+    const r = Math.floor(20 + depth * 15);
+    const g = Math.floor(8 + depth * 8);
+    const b = Math.floor(50 + depth * 30);
+    drawPixelRect(x + i * foldW, y + 6, foldW + 1, h - 6, `rgb(${r},${g},${b})`);
+    
+    // Highlight on fold edge
+    ctx.globalAlpha = 0.08;
+    drawPixelRect(x + i * foldW, y + 6, 2, h - 6, '#ffffff');
+    ctx.globalAlpha = 1;
+  }
+
+  // Tieback
+  const tieY = y + h * 0.35;
+  drawPixelRect(x + w * 0.2, tieY, w * 0.6, 5, '#c8a432');
+  drawPixelRect(x + w * 0.15, tieY - 2, 6, 9, '#dab842');
+  drawPixelRect(x + w * 0.75, tieY - 2, 6, 9, '#dab842');
+  
+  // Tassel
+  drawPixelRect(x + w * 0.45, tieY + 5, 3, 12, '#c8a432');
+  for (let t = 0; t < 5; t++) {
+    drawPixelRect(x + w * 0.42 + t * 3, tieY + 17, 2, 8 + (t % 2) * 3, '#a08020');
+  }
+}
+
+// ============ BOOKSHELF ============
+function drawBookshelf(x, y, shelfW, shelfH) {
+  // Shelf frame
+  drawPixelRect(x, y, shelfW, shelfH, '#3a2210');
+  drawPixelRect(x + 2, y + 2, shelfW - 4, shelfH - 4, '#2a1808');
+  
+  const shelfCount = 3;
+  const rowH = (shelfH - 8) / shelfCount;
+  
+  for (let s = 0; s < shelfCount; s++) {
+    const sy = y + 4 + s * rowH;
+    // Shelf plank
+    drawPixelRect(x + 2, sy + rowH - 4, shelfW - 4, 4, '#4a3018');
+    drawPixelRect(x + 2, sy + rowH - 5, shelfW - 4, 1, '#5a4020');
+    
+    // Books
+    const bookArea = shelfW - 12;
+    let bx = x + 6;
+    const bookColors = ['#8b0000','#1a1a6e','#006633','#663300','#330033','#004466','#cc6600','#222','#880044'];
+    for (let b = 0; b < 6 + Math.floor(Math.random() * 0.01); b++) {
+      const bw = 4 + (((s * 7 + b * 13) % 5));
+      const bh = rowH - 10 - ((s * 3 + b * 7) % 6);
+      if (bx + bw > x + shelfW - 6) break;
+      const color = bookColors[(s * 7 + b * 3) % bookColors.length];
+      drawPixelRect(bx, sy + rowH - 5 - bh, bw, bh, color);
+      // Spine detail
+      ctx.globalAlpha = 0.2;
+      drawPixelRect(bx + 1, sy + rowH - 5 - bh + 2, bw - 2, 2, '#ffffff');
+      drawPixelRect(bx + 1, sy + rowH - 5 - bh + bh * 0.4, bw - 2, 1, '#ffffff');
+      ctx.globalAlpha = 1;
+      bx += bw + 1;
+    }
+  }
+}
+
+// ============ PAINTING ============
+function drawPainting(cx, cy, pw, ph) {
+  // Ornate frame
+  drawPixelRect(cx - pw/2 - 6, cy - ph/2 - 6, pw + 12, ph + 12, '#c8a432');
+  drawPixelRect(cx - pw/2 - 4, cy - ph/2 - 4, pw + 8, ph + 8, '#a08020');
+  drawPixelRect(cx - pw/2 - 2, cy - ph/2 - 2, pw + 4, ph + 4, '#806018');
+  
+  // Canvas
+  drawPixelRect(cx - pw/2, cy - ph/2, pw, ph, '#1a2844');
+  
+  // Landscape painting content
+  const lg = ctx.createLinearGradient(cx - pw/2, cy - ph/2, cx - pw/2, cy + ph/2);
+  lg.addColorStop(0, '#0a1628');
+  lg.addColorStop(0.4, '#1a3050');
+  lg.addColorStop(0.6, '#2a4a30');
+  lg.addColorStop(1, '#1a3020');
+  ctx.fillStyle = lg;
+  ctx.fillRect(cx - pw/2, cy - ph/2, pw, ph);
+  
+  // Moon
+  ctx.fillStyle = '#dde8ff';
+  ctx.beginPath();
+  ctx.arc(cx + pw * 0.25, cy - ph * 0.25, 6, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Mountain silhouettes
+  ctx.fillStyle = '#0a2018';
+  ctx.beginPath();
+  ctx.moveTo(cx - pw/2, cy + ph * 0.1);
+  ctx.lineTo(cx - pw * 0.15, cy - ph * 0.2);
+  ctx.lineTo(cx + pw * 0.1, cy + ph * 0.15);
+  ctx.lineTo(cx + pw * 0.3, cy - ph * 0.1);
+  ctx.lineTo(cx + pw/2, cy + ph * 0.2);
+  ctx.lineTo(cx + pw/2, cy + ph/2);
+  ctx.lineTo(cx - pw/2, cy + ph/2);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Frame corner accents
+  const corners = [
+    [cx - pw/2 - 5, cy - ph/2 - 5],
+    [cx + pw/2 + 1, cy - ph/2 - 5],
+    [cx - pw/2 - 5, cy + ph/2 + 1],
+    [cx + pw/2 + 1, cy + ph/2 + 1],
+  ];
+  corners.forEach(([cxc, cyc]) => {
+    drawPixelRect(cxc, cyc, 4, 4, '#dab842');
+  });
+}
+
+// ============ WINDOW ============
+function drawWindow(w, h) {
+  const win = getWin(w, h);
+
+  // Ornate window frame
+  drawPixelRect(win.l - 10, win.t - 14, win.ww + 20, win.wh + 24, '#c8a432');
+  drawPixelRect(win.l - 8, win.t - 12, win.ww + 16, win.wh + 20, '#a08020');
+  drawPixelRect(win.l - 5, win.t - 5, win.ww + 10, win.wh + 10, '#806018');
+  // Arch top decoration
+  drawPixelRect(win.l - 8, win.t - 16, win.ww + 16, 6, '#dab842');
+  drawPixelRect(win.cx - 6, win.t - 20, 12, 8, '#dab842');
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(win.l, win.t, win.ww, win.wh);
+  ctx.clip();
+
+  if (state.strikeActive) {
+    drawStrikeScene(win.l, win.t, win.ww, win.wh, state.strikeType === 'nuclear');
+  } else {
+    const r = Math.floor(10 + state.skyRed * 100);
+    const g2 = Math.floor(10 * (1 - state.skyRed));
+    const b = Math.floor(46 * (1 - state.skyRed) + 5 * state.skyRed);
+    const sg = ctx.createLinearGradient(win.l, win.t, win.l, win.b);
+    sg.addColorStop(0, `rgb(${r},${Math.max(0,g2)},${Math.max(0,b)})`);
+    sg.addColorStop(0.6, `rgb(${Math.min(r+15,160)},${Math.max(0,g2+3)},${Math.max(0,b+8)})`);
+    sg.addColorStop(1, `rgb(${Math.min(r+25,180)},${Math.max(0,g2+8)},${Math.max(0,b+15)})`);
+    ctx.fillStyle = sg;
+    ctx.fillRect(win.l, win.t, win.ww, win.wh);
+
+    // Stars with twinkle
+    if (state.skyRed < 0.3) {
+      const alpha = 1 - state.skyRed * 3.3;
+      for (let i = 0; i < 18; i++) {
+        const twinkle = 0.3 + Math.sin(state.time * 3 + i * 1.7) * 0.4;
+        ctx.fillStyle = `rgba(255,255,240,${alpha * twinkle})`;
+        const sx = win.l + ((i * 37 + 13) % win.ww);
+        const sy = win.t + ((i * 23 + 7) % (win.wh * 0.6));
+        ctx.fillRect(sx, sy, 2, 2);
+        if (i % 4 === 0) {
+          ctx.fillRect(sx - 1, sy, 4, 1);
+          ctx.fillRect(sx, sy - 1, 1, 4);
+        }
+      }
+    }
+
+    // City skyline silhouette
+    ctx.fillStyle = state.skyRed > 0.3 ? '#180808' : '#060610';
+    const groundLine = win.b - win.wh * 0.12;
+    ctx.fillRect(win.l, groundLine, win.ww, win.b - groundLine);
+    // Buildings
+    const blds = [
+      [0.05, 0.25], [0.15, 0.18], [0.25, 0.35], [0.35, 0.15],
+      [0.45, 0.28], [0.55, 0.20], [0.65, 0.32], [0.75, 0.16], [0.88, 0.22]
+    ];
+    blds.forEach(([bx, bh]) => {
+      const bldW = win.ww * 0.08;
+      const bldH = win.wh * bh;
+      ctx.fillRect(win.l + bx * win.ww, groundLine - bldH, bldW, bldH);
+      // Window lights
+      if (state.skyRed < 0.5) {
+        for (let wy = groundLine - bldH + 3; wy < groundLine - 3; wy += 5) {
+          for (let wx = 2; wx < bldW - 2; wx += 4) {
+            if (Math.sin(bx * 100 + wy * 7 + wx * 3) > 0.2) {
+              ctx.fillStyle = `rgba(255,220,100,${0.3 + Math.sin(state.time + bx * 10 + wy) * 0.15})`;
+              ctx.fillRect(win.l + bx * win.ww + wx, wy, 2, 2);
+            }
+          }
+        }
+        ctx.fillStyle = state.skyRed > 0.3 ? '#180808' : '#060610';
+      }
+    });
+
+    if (state.skyRed > 0) state.skyRed = Math.max(0, state.skyRed - 0.006);
+  }
+  ctx.restore();
+
+  // Window cross bars
+  drawPixelRect(win.cx - 2, win.t, 4, win.wh, '#a08020');
+  drawPixelRect(win.l, win.cy - 2, win.ww, 4, '#a08020');
+  // Bar details
+  drawPixelRect(win.cx - 1, win.t, 2, win.wh, '#806018');
+  drawPixelRect(win.l, win.cy - 1, win.ww, 2, '#806018');
+}
+
+// ============ STRIKE SCENE ============
+function drawStrikeScene(wx, wy, ww, wh, isNuclear=false) {
+  const t = state.strikeTime;
+  const cx = wx + ww/2;
+  const groundY = wy + wh * 0.85;
+  const launchDuration = isNuclear ? 1.8 : 1.2;
+  const flashDuration = isNuclear ? 0.45 : 0.3;
+  const cloudDuration = isNuclear ? 4.6 : 2.3;
+  const fadeDuration = isNuclear ? 1.8 : 1.0;
+  const totalDuration = launchDuration + flashDuration + cloudDuration + fadeDuration;
+  const si = isNuclear
+    ? (t < launchDuration ? 8 : t < launchDuration + flashDuration ? 34 : t < launchDuration + flashDuration + cloudDuration ? 22 : 10)
+    : (t < launchDuration ? 4 : t < launchDuration + flashDuration ? 22 : t < launchDuration + flashDuration + cloudDuration ? 14 : 6);
+  state.shakeX = (Math.random() - 0.5) * si;
+  state.shakeY = (Math.random() - 0.5) * si;
+
+  if (t < launchDuration) {
+    const p = t / launchDuration;
+    ctx.fillStyle = `rgb(${10 + p*130},${Math.max(0, 10 - p*10)},${Math.max(0, 46 - p*46)})`;
+    ctx.fillRect(wx, wy, ww, wh);
+    ctx.fillStyle = '#080808';
+    ctx.fillRect(wx, groundY, ww, wh*0.15);
+    const bldgs = [0.08,0.22,0.38,0.52,0.68,0.82];
+    bldgs.forEach((bx,i) => {
+      const bh = 12 + (i%3)*10;
+      ctx.fillRect(wx + bx*ww, groundY - bh, 10, bh);
+    });
+    const my = groundY - p * wh * (isNuclear ? 1.9 : 1.4);
+    for (let i = 0; i < (isNuclear ? 26 : 14); i++) {
+      const fy = my + 14 + i*5;
+      if (fy > groundY) continue;
+      const fx = cx + (Math.random()-0.5)*(isNuclear ? (10+i*2.6) : (4+i*1.8));
+      const fs = isNuclear ? (4 + i*1.6) : (2 + i*1.2);
+      ctx.fillStyle = ['#ff4400','#ff8800','#ffcc00','#ff2200'][i%4];
+      ctx.globalAlpha = Math.max(0, 0.95 - i*0.03);
+      ctx.fillRect(fx-fs/2, fy, fs, fs);
+    }
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < (isNuclear ? 12 : 6); i++) {
+      const sy = groundY - i*8 - p*(isNuclear ? 28 : 15);
+      ctx.fillStyle = `rgba(70,70,70,${(isNuclear ? 0.55 : 0.35) - i*0.04})`;
+      ctx.beginPath();
+      ctx.arc(cx + (Math.random()-0.5)*(isNuclear ? (10+i*5) : (5+i*3)), sy, (isNuclear ? 7 : 3)+(i*(isNuclear ? 3.6 : 2.5)), 0, Math.PI*2);
+      ctx.fill();
+    }
+    const bodyW = isNuclear ? 10 : 6;
+    const bodyH = isNuclear ? 28 : 16;
+    if (my > wy - 25) {
+      ctx.fillStyle = '#ddd';
+      ctx.fillRect(cx - bodyW/2, my, bodyW, bodyH);
+      ctx.fillStyle = '#c00';
+      ctx.fillRect(cx - bodyW/2, my, bodyW, isNuclear ? 6 : 4);
+      ctx.fillStyle = '#aaa';
+      ctx.beginPath();
+      ctx.moveTo(cx-bodyW/2, my);
+      ctx.lineTo(cx, my-(isNuclear ? 10 : 6));
+      ctx.lineTo(cx+bodyW/2, my);
+      ctx.fill();
+      ctx.fillStyle = '#999';
+      ctx.fillRect(cx-(isNuclear ? 9 : 5), my+bodyH-4, isNuclear ? 5 : 3, isNuclear ? 7 : 5);
+      ctx.fillRect(cx+(isNuclear ? 4 : 2), my+bodyH-4, isNuclear ? 5 : 3, isNuclear ? 7 : 5);
+    }
+  } else if (t < launchDuration + flashDuration) {
+    const fp = (t - launchDuration) / flashDuration;
+    const brightness = fp < 0.5 ? 255 : Math.floor(255 * (1 - (fp-0.5)*(isNuclear ? 0.7 : 1.2)));
+    ctx.fillStyle = `rgb(${brightness},${Math.floor(brightness*0.96)},${Math.floor(brightness*0.88)})`;
+    ctx.fillRect(wx, wy, ww, wh);
+  } else if (t < launchDuration + flashDuration + cloudDuration) {
+    const p = (t - launchDuration - flashDuration) / cloudDuration;
+    const sr = isNuclear ? (220 - p*90) : (180 - p*60);
+    ctx.fillStyle = `rgb(${sr},${20 + p*10},${5 + p*6})`;
+    ctx.fillRect(wx, wy, ww, wh);
+    const glowRadius = isNuclear ? ww*0.95 : ww*0.6;
+    const hg = ctx.createRadialGradient(cx, groundY, 0, cx, groundY, glowRadius);
+    hg.addColorStop(0, `rgba(255,180,20,${isNuclear ? 0.85*(1-p*0.45) : 0.6*(1-p*0.6)})`);
+    hg.addColorStop(1, 'rgba(255,40,0,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(wx, wy, ww, wh);
+    ctx.fillStyle = '#120800';
+    ctx.fillRect(wx, groundY, ww, wh*0.15);
+    const bldgs = [0.08,0.22,0.38,0.52,0.68,0.82];
+    bldgs.forEach((bx,i) => {
+      ctx.fillStyle = '#120800';
+      ctx.fillRect(wx+bx*ww, groundY-(3+(i%3)*3), isNuclear ? 12 : 8, 3+(i%3)*3);
+    });
+    const stemW = isNuclear ? (14 + p*28) : (8 + p*14);
+    const stemH = wh * (isNuclear ? 0.62 : 0.38) * Math.min(1, p*(isNuclear ? 2.6 : 2.2));
+    const stGrad = ctx.createLinearGradient(cx-stemW/2, groundY, cx+stemW/2, groundY);
+    stGrad.addColorStop(0,'#4a2000');
+    stGrad.addColorStop(0.5, isNuclear ? '#ffcc00' : '#ff5500');
+    stGrad.addColorStop(1,'#4a2000');
+    ctx.fillStyle = stGrad;
+    ctx.fillRect(cx-stemW/2, groundY-stemH, stemW, stemH);
+    const capR = isNuclear ? (24 + p*62) : (12 + p*32);
+    const capY = groundY - stemH - capR*0.15;
+    const cg = ctx.createRadialGradient(cx,capY,0,cx,capY,capR);
+    cg.addColorStop(0, isNuclear ? '#ffffcc' : '#ffee00');
+    cg.addColorStop(0.2, isNuclear ? '#fff176' : '#ff8800');
+    cg.addColorStop(0.45, '#ff8800');
+    cg.addColorStop(0.7, '#cc3300');
+    cg.addColorStop(1, 'rgba(60,15,0,0.25)');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.ellipse(cx, capY, capR, capR*(isNuclear ? 0.58 : 0.45), 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,180,${(isNuclear ? 0.75 : 0.5)*(1-p*0.8)})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, capY, capR*(isNuclear ? 0.34 : 0.25), capR*(isNuclear ? 0.18 : 0.12), 0, 0, Math.PI*2);
+    ctx.fill();
+    for (let i = 0; i < (isNuclear ? 44 : 18); i++) {
+      const a = Math.random()*Math.PI*2;
+      const d = Math.random()*capR*1.35;
+      ctx.fillStyle = ['#ff4400','#ff8800','#ffcc00','#ff0000','#fff59d'][Math.floor(Math.random()*(isNuclear ? 5 : 4))];
+      ctx.globalAlpha = (isNuclear ? 0.45 : 0.3) + Math.random()*(isNuclear ? 0.4 : 0.3);
+      ctx.fillRect(cx + Math.cos(a)*d, capY + Math.sin(a)*d*(isNuclear ? 0.58 : 0.45), 1+Math.random()*(isNuclear ? 5 : 3), 1+Math.random()*(isNuclear ? 5 : 3));
+    }
+    ctx.globalAlpha = 1;
+    if (p > 0.08) {
+      const rp = (p-0.08)/(0.92);
+      const rr = rp*ww*(isNuclear ? 0.95 : 0.5);
+      ctx.strokeStyle = `rgba(255,220,120,${(isNuclear ? 0.75 : 0.5)*(1-rp)})`;
+      ctx.lineWidth = isNuclear ? 4 : 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, groundY, rr, rr*(isNuclear ? 0.18 : 0.1), 0, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    for (let i = 0; i < (isNuclear ? 22 : 8); i++) {
+      ctx.fillStyle = `rgba(255,${80+Math.random()*120},0,${(isNuclear ? 0.28 : 0.15)+Math.random()*(isNuclear ? 0.3 : 0.25)})`;
+      ctx.fillRect(wx+Math.random()*ww, wy+Math.random()*wh, isNuclear ? 2 : 1, isNuclear ? 2 : 1);
+    }
+  } else if (t < totalDuration) {
+    const p = (t - launchDuration - flashDuration - cloudDuration) / fadeDuration;
+    const sr = isNuclear ? (155 - p*65) : (120 - p*50);
+    ctx.fillStyle = `rgb(${Math.max(60,sr)},${10+p*6},${5+p*10})`;
+    ctx.fillRect(wx, wy, ww, wh);
+    for (let i = 0; i < (isNuclear ? 10 : 4); i++) {
+      ctx.fillStyle = `rgba(50,25,8,${(isNuclear ? 0.38 : 0.25)*(1-p)})`;
+      ctx.beginPath();
+      ctx.arc(wx+Math.random()*ww, wy+wh*0.2+Math.random()*wh*0.5, (isNuclear ? 10 : 4)+Math.random()*(isNuclear ? 22 : 12), 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#120800';
+    ctx.fillRect(wx, groundY, ww, wh*0.15);
+    state.skyRed = 1.0;
+  } else {
+    state.strikeActive = false;
+    state.shakeX = 0;
+    state.shakeY = 0;
+    state.skyRed = 1.0;
+    nextTarget();
+  }
+}
+
+// ============ ENHANCED TV ============
+function drawTV(cx, cy, w, h) {
+  // TV cabinet - more detailed retro look
+  const cabW = w + 28, cabH = h + 40;
+  
+  // Wood cabinet body
+  drawPixelRect(cx - cabW/2, cy - h/2 - 14, cabW, cabH, '#3a2a1a');
+  drawPixelRect(cx - cabW/2 + 2, cy - h/2 - 12, cabW - 4, cabH - 4, '#4a3828');
+  
+  // Top trim
+  drawPixelRect(cx - cabW/2, cy - h/2 - 16, cabW, 4, '#5a4830');
+  
+  // Screen bezel
+  drawPixelRect(cx - w/2 - 6, cy - h/2 - 6, w + 12, h + 12, '#2a2a2a');
+  drawPixelRect(cx - w/2 - 4, cy - h/2 - 4, w + 8, h + 8, '#1a1a1a');
+  
+  // Screen glow
+  const glowColor = state.mode === 'money' ? '#00ff88' : '#ff4444';
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 25;
+  drawPixelRect(cx - w/2, cy - h/2, w, h, '#0a0a0a');
+  ctx.shadowBlur = 0;
+
+  // Scanlines + static
+  if (state.tvStatic > 0) {
+    for (let i = 0; i < 250; i++) {
+      const bright = Math.random() * 255;
+      drawPixelRect(cx-w/2+Math.random()*w, cy-h/2+Math.random()*h, 3, 2, `rgb(${bright},${bright},${bright})`);
+    }
+    state.tvStatic -= 0.05;
+    drawTVExtras(cx, cy, w, h, cabW);
+    return;
+  }
+
+  // CRT scanlines
+  for (let i = 0; i < h; i += 3) {
+    drawPixelRect(cx - w/2, cy - h/2 + i, w, 1, 'rgba(0,0,0,0.35)');
+  }
+  // Moving scanline
+  drawPixelRect(cx - w/2, cy - h/2 + (Date.now()/20) % h, w, 3, 'rgba(255,255,255,0.06)');
+  
+  // CRT vignette
+  const vig = ctx.createRadialGradient(cx, cy, w * 0.15, cx, cy, w * 0.65);
+  vig.addColorStop(0, 'transparent');
+  vig.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(cx - w/2, cy - h/2, w, h);
+
+  // Target info
+  const target = targets[state.currentTarget % targets.length];
+  
+  // Target type badge
+  const typeColor = { edificio: '#4488ff', lugar: '#44ff88', región: '#ff8844', persona: '#ff44aa', empresa: '#44ddff', banco: '#ffdd44' }[target.type] || '#888';
+  
+  drawPixelText(target.icon, cx, cy - h * 0.2, Math.min(w * 0.25, 40), '#fff');
+  drawPixelText(target.name, cx, cy + h * 0.06, Math.min(w * 0.06, 11), '#fff');
+  
+  // Type badge with background
+  const typeText = `[${target.type.toUpperCase()}]`;
+  const badgeSize = Math.min(w * 0.04, 8);
+  drawPixelText(typeText, cx, cy + h * 0.2, badgeSize, typeColor);
+
+  // Mode indicator
+  const modeIcon = state.mode === 'money' ? '💰' : '⚠️';
+  const modeColor = state.mode === 'money' ? '#00ff88' : '#ff4444';
+  const amtText = state.mode === 'money'
+    ? `$${state.amount}B`
+    : (state.amount === 'bomb' ? 'BOMBA' : 'ALERTA NUCLEAR');
+  drawPixelText(`${modeIcon} ${amtText}`, cx, cy + h * 0.36, Math.min(w * 0.07, 13), modeColor);
+
+  // Corner decorations on screen
+  const sc = 6;
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy]) => {
+    const scx = cx + dx * (w/2 - sc - 2);
+    const scy = cy + dy * (h/2 - sc - 2);
+    ctx.strokeStyle = `${modeColor}44`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(scx - dx * sc, scy);
+    ctx.lineTo(scx, scy);
+    ctx.lineTo(scx, scy - dy * sc);
+    ctx.stroke();
+  });
+
+  drawTVExtras(cx, cy, w, h, cabW);
+}
+
+function drawTVExtras(cx, cy, w, h, cabW) {
+  // Antenna - more detailed
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, cy - h/2 - 14);
+  ctx.lineTo(cx - 35, cy - h/2 - 52);
+  ctx.moveTo(cx + 12, cy - h/2 - 14);
+  ctx.lineTo(cx + 35, cy - h/2 - 52);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#666';
+  ctx.beginPath();
+  ctx.moveTo(cx - 25, cy - h/2 - 38);
+  ctx.lineTo(cx + 25, cy - h/2 - 38);
+  ctx.stroke();
+  
+  // Antenna tips
+  drawPixelRect(cx - 37, cy - h/2 - 56, 6, 6, '#aaa');
+  drawPixelRect(cx + 31, cy - h/2 - 56, 6, 6, '#aaa');
+  // Signal indicator on tip
+  ctx.fillStyle = state.tvStatic > 0 ? '#ff0000' : '#00ff00';
+  ctx.fillRect(cx - 36, cy - h/2 - 55, 4, 4);
+  ctx.fillRect(cx + 32, cy - h/2 - 55, 4, 4);
+
+  // Side panel with knobs
+  const panelX = cx + w/2 + 8;
+  drawPixelRect(panelX, cy - h/4, 14, h/2, '#3a2a1a');
+  
+  // Volume knob
+  drawPixelRect(panelX + 2, cy - 14, 10, 10, '#222');
+  drawPixelRect(panelX + 4, cy - 12, 6, 6, '#555');
+  drawPixelRect(panelX + 6, cy - 12, 2, 3, '#888');
+  
+  // Channel knob
+  drawPixelRect(panelX + 2, cy + 6, 10, 10, '#222');
+  drawPixelRect(panelX + 4, cy + 8, 6, 6, '#555');
+  drawPixelRect(panelX + 6, cy + 8, 2, 3, '#888');
+  
+  // Speaker grill
+  for (let i = 0; i < 4; i++) {
+    drawPixelRect(cx - cabW/2 + 6, cy + h/2 + 6 + i * 5, cabW * 0.3, 2, '#333');
+  }
+  
+  // TV legs
+  drawPixelRect(cx - w/2 - 2, cy + h/2 + 22, 10, 20, '#3a2a1a');
+  drawPixelRect(cx + w/2 - 8, cy + h/2 + 22, 10, 20, '#3a2a1a');
+  drawPixelRect(cx - w/2 - 4, cy + h/2 + 20, cabW + 8, 4, '#4a3828');
+  
+  // Brand label
+  drawPixelRect(cx - 18, cy + h/2 + 3, 36, 8, '#2a2a2a');
+  drawPixelText('PODER', cx, cy + h/2 + 7, 5, '#666');
+}
+
+// ============ ENHANCED CHARACTER ============
+function drawTrump(cx, cy, s) {
+  const bobY = Math.sin(state.time * 1.5) * 2;
+  const ay = cy + bobY;
+  const breathe = Math.sin(state.time * 2) * 0.5;
+
+  // Chair
+  drawPixelRect(cx - 34*s, ay + 10*s, 68*s, 30*s, '#1a0a2e');
+  drawPixelRect(cx - 36*s, ay - 35*s, 6*s, 66*s, '#2a1a3e');
+  drawPixelRect(cx + 30*s, ay - 35*s, 6*s, 66*s, '#2a1a3e');
+  drawPixelRect(cx - 36*s, ay - 37*s, 72*s, 8*s, '#2a1a3e');
+  // Chair cushion
+  drawPixelRect(cx - 30*s, ay + 12*s, 60*s, 8*s, '#3a1a4e');
+  // Chair back
+  drawPixelRect(cx - 32*s, ay - 30*s, 64*s, 40*s, '#2a1440');
+  // Gold trim on chair
+  drawPixelRect(cx - 36*s, ay - 37*s, 72*s, 3*s, '#c8a432');
+  drawPixelRect(cx - 36*s, ay + 38*s, 6*s, 4*s, '#c8a432');
+  drawPixelRect(cx + 30*s, ay + 38*s, 6*s, 4*s, '#c8a432');
+
+  // Body - suit jacket
+  drawPixelRect(cx - 22*s, ay - 4*s + breathe, 44*s, 28*s, '#1a1a3a');
+  // Lapels
+  ctx.fillStyle = '#222244';
+  ctx.beginPath();
+  ctx.moveTo(cx - 6*s, ay - 4*s + breathe);
+  ctx.lineTo(cx - 18*s, ay - 4*s + breathe);
+  ctx.lineTo(cx - 8*s, ay + 12*s + breathe);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 6*s, ay - 4*s + breathe);
+  ctx.lineTo(cx + 18*s, ay - 4*s + breathe);
+  ctx.lineTo(cx + 8*s, ay + 12*s + breathe);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Shirt
+  drawPixelRect(cx - 5*s, ay - 2*s + breathe, 10*s, 18*s, '#ffffff');
+  // Tie
+  drawPixelRect(cx - 3*s, ay - 2*s + breathe, 6*s, 20*s, '#cc0000');
+  drawPixelRect(cx - 4*s, ay - 2*s + breathe, 8*s, 3*s, '#cc0000');
+  // Tie stripes
+  for (let ts = 0; ts < 4; ts++) {
+    drawPixelRect(cx - 2*s, ay + 2*s + ts * 5*s + breathe, 4*s, 1*s, '#990000');
+  }
+
+  // Shoulders / padding
+  drawPixelRect(cx - 26*s, ay - 4*s + breathe, 8*s, 8*s, '#1a1a3a');
+  drawPixelRect(cx + 18*s, ay - 4*s + breathe, 8*s, 8*s, '#1a1a3a');
+
+  // Arms with animation
+  const aa = state.trumpAnim > 0 ? Math.sin(state.trumpAnim * 10) * 5 : 0;
+  // Left arm
+  drawPixelRect(cx - 28*s, ay - 2*s + aa, 8*s, 22*s, '#1a1a3a');
+  drawPixelRect(cx - 28*s, ay + 18*s + aa, 8*s, 6*s, '#f4c99a');
+  // Cufflink
+  drawPixelRect(cx - 28*s, ay + 16*s + aa, 8*s, 3*s, '#ffffff');
+  drawPixelRect(cx - 26*s, ay + 17*s + aa, 2*s, 1*s, '#c8a432');
+  
+  // Right arm
+  drawPixelRect(cx + 20*s, ay - 2*s - aa, 8*s, 22*s, '#1a1a3a');
+  drawPixelRect(cx + 20*s, ay + 18*s - aa, 8*s, 6*s, '#f4c99a');
+  drawPixelRect(cx + 20*s, ay + 16*s - aa, 8*s, 3*s, '#ffffff');
+  drawPixelRect(cx + 24*s, ay + 17*s - aa, 2*s, 1*s, '#c8a432');
+
+  // Head
+  const hy = ay - 36*s;
+  // Neck
+  drawPixelRect(cx - 4*s, hy + 18*s, 8*s, 6*s, '#f4c99a');
+  // Face
+  drawPixelRect(cx - 11*s, hy, 22*s, 22*s, '#f4c99a');
+  // Ear
+  drawPixelRect(cx - 13*s, hy + 6*s, 3*s, 8*s, '#e8b888');
+  drawPixelRect(cx + 10*s, hy + 6*s, 3*s, 8*s, '#e8b888');
+  
+  // Hair - more detailed
+  drawPixelRect(cx - 13*s, hy - 6*s, 28*s, 10*s, '#f0c040');
+  drawPixelRect(cx - 15*s, hy - 4*s, 6*s, 10*s, '#daa520');
+  drawPixelRect(cx + 11*s, hy - 2*s, 6*s, 8*s, '#daa520');
+  // Hair highlight
+  drawPixelRect(cx - 8*s, hy - 6*s, 10*s, 3*s, '#f8d050');
+  // Hair swoosh
+  drawPixelRect(cx + 10*s, hy - 6*s, 8*s, 4*s, '#e8b830');
+  drawPixelRect(cx + 14*s, hy - 4*s, 4*s, 3*s, '#d8a820');
+  
+  // Eyebrows
+  drawPixelRect(cx - 8*s, hy + 4*s, 5*s, 2*s, '#c89020');
+  drawPixelRect(cx + 3*s, hy + 4*s, 5*s, 2*s, '#c89020');
+  
+  // Eyes
+  drawPixelRect(cx - 7*s, hy + 7*s, 4*s, 3*s, '#fff');
+  drawPixelRect(cx + 3*s, hy + 7*s, 4*s, 3*s, '#fff');
+  drawPixelRect(cx - 6*s, hy + 8*s, 2*s, 2*s, '#2244aa');
+  drawPixelRect(cx + 4*s, hy + 8*s, 2*s, 2*s, '#2244aa');
+  
+  // Nose
+  drawPixelRect(cx - 2*s, hy + 11*s, 4*s, 3*s, '#e8b080');
+  
+  // Mouth
+  if (state.trumpAnim > 0) {
+    drawPixelRect(cx - 4*s, hy + 16*s, 8*s, 4*s, '#c44');
+    drawPixelRect(cx - 3*s, hy + 17*s, 6*s, 1*s, '#fff');
+  } else {
+    drawPixelRect(cx - 3*s, hy + 16*s, 6*s, 2*s, '#d88');
+  }
+
+  // Chin
+  drawPixelRect(cx - 5*s, hy + 19*s, 10*s, 3*s, '#e8b888');
+
+  if (state.trumpAnim > 0) state.trumpAnim -= 0.02;
+}
+
+// ============ ENHANCED DESK ============
+function drawDesk(cx, cy, w, h) {
+  // Desk shadow
+  ctx.globalAlpha = 0.15;
+  drawPixelRect(cx - w/2 + 5, cy + h + 2, w - 4, 8, '#000');
+  ctx.globalAlpha = 1;
+
+  // Main desk body - resolute desk style
+  drawPixelRect(cx - w/2, cy, w, h, '#5c3a1e');
+  
+  // Top surface with polish effect
+  const topGrad = ctx.createLinearGradient(cx - w/2, cy, cx - w/2, cy + 6);
+  topGrad.addColorStop(0, '#8a6030');
+  topGrad.addColorStop(1, '#5c3a1e');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(cx - w/2, cy, w, 6);
+  
+  // Gold edge trim
+  drawPixelRect(cx - w/2, cy, w, 3, '#c8a432');
+  drawPixelRect(cx - w/2, cy + h - 2, w, 2, '#c8a432');
+  
+  // Panel details
+  drawPixelRect(cx - w/2 + 3, cy + 6, w - 6, h - 8, '#4a2a10');
+  // Inner panel border
+  ctx.strokeStyle = '#6a4a28';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cx - w/2 + 8, cy + 10, w - 16, h - 16);
+  
+  // Presidential seal
+  ctx.beginPath();
+  ctx.arc(cx, cy + h/2 + 3, 20, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8a432';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy + h/2 + 3, 17, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a3a';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy + h/2 + 3, 14, 0, Math.PI * 2);
+  ctx.strokeStyle = '#c8a432';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  drawPixelText('★', cx, cy + h/2 + 3, 14, '#c8a432');
+  
+  // Desk items - pen holder
+  drawPixelRect(cx + w * 0.3, cy - 8, 12, 8, '#333');
+  drawPixelRect(cx + w * 0.3 + 2, cy - 14, 2, 8, '#c8a432');
+  drawPixelRect(cx + w * 0.3 + 6, cy - 12, 2, 6, '#c8a432');
+  
+  // Phone
+  drawPixelRect(cx - w * 0.32, cy - 10, 18, 10, '#222');
+  drawPixelRect(cx - w * 0.32, cy - 14, 8, 6, '#333');
+  drawPixelRect(cx - w * 0.32 + 2, cy - 8, 14, 2, '#444');
+  // Phone light
+  drawPixelRect(cx - w * 0.32 + 14, cy - 9, 2, 2, state.mode === 'bombs' ? '#ff0000' : '#00ff00');
+  
+  // Papers stack
+  drawPixelRect(cx + w * 0.15, cy - 5, 20, 5, '#f0ead8');
+  drawPixelRect(cx + w * 0.16, cy - 7, 18, 5, '#ede5d0');
+  drawPixelRect(cx + w * 0.155, cy - 9, 19, 5, '#e8e0c8');
+}
+
+// ============ FLAG ============
+function drawFlagPole(x, topY, height) {
+  // Pole
+  const poleGrad = ctx.createLinearGradient(x - 2, topY, x + 2, topY);
+  poleGrad.addColorStop(0, '#dab842');
+  poleGrad.addColorStop(0.5, '#c8a432');
+  poleGrad.addColorStop(1, '#a08020');
+  ctx.fillStyle = poleGrad;
+  ctx.fillRect(x - 2, topY, 4, height);
+  
+  // Pole finial (eagle/ball)
+  drawPixelRect(x - 4, topY - 10, 8, 10, '#c8a432');
+  drawPixelRect(x - 3, topY - 12, 6, 4, '#dab842');
+  drawPixelRect(x - 1, topY - 14, 2, 3, '#dab842');
+  
+  // Flag with wave
+  const flagW = 32;
+  const flagH = 18;
+  const wave = Math.sin(state.time * 2) * 2;
+  
+  ctx.save();
+  // Red stripes
+  for (let s = 0; s < 7; s++) {
+    const stripColor = s % 2 === 0 ? '#cc0000' : '#ffffff';
+    const sy = topY - 4 + s * (flagH / 7);
+    const waveOff = Math.sin(state.time * 2 + s * 0.3) * 1.5;
+    ctx.fillStyle = stripColor;
+    ctx.fillRect(x + 3, sy + waveOff, flagW + wave, flagH / 7 + 1);
+  }
+  // Blue canton
+  const cantonW = flagW * 0.4;
+  const cantonH = flagH * 0.55;
+  ctx.fillStyle = '#1a1a6e';
+  ctx.fillRect(x + 3, topY - 4 + Math.sin(state.time * 2) * 1, cantonW, cantonH);
+  // Stars
+  ctx.fillStyle = '#fff';
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      ctx.fillRect(x + 5 + c * 4, topY - 2 + r * 3 + Math.sin(state.time * 2) * 1, 1, 1);
+    }
+  }
+  ctx.restore();
+  
+  // Base
+  drawPixelRect(x - 8, topY + height - 4, 16, 8, '#c8a432');
+  drawPixelRect(x - 10, topY + height + 2, 20, 4, '#a08020');
+}
+
+// ============ PARTICLES ============
+function updateParticles() {
+  state.moneyParticles = state.moneyParticles.filter(p => p.life > 0);
+  state.moneyParticles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.rotation = (p.rotation || 0) + p.rotSpeed;
+    p.life -= 0.015;
+    
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.globalAlpha = Math.min(1, p.life * 2);
+    ctx.font = `${p.size}px 'Press Start 2P', monospace`;
+    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},1)`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  });
+}
+function spawnMoneyParticles(x, y) {
+  for (let i = 0; i < 20; i++) {
+    state.moneyParticles.push({
+      x: x + (Math.random() - 0.5) * 100,
+      y: y + (Math.random() - 0.5) * 40,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -Math.random() * 6 - 2,
+      text: ['💰','$','💵','🤑','💲'][Math.floor(Math.random() * 5)],
+      size: 10 + Math.random() * 16,
+      life: 1,
+      r: 0, g: 255, b: 136,
+      rotation: 0,
+      rotSpeed: (Math.random() - 0.5) * 0.1,
+    });
+  }
+}
+
+// ============ GAME LOGIC ============
+function startStrike(type) {
+  state.strikeType = type;
+  state.strikeActive = true;
+  state.strikeTime = 0;
+  playImpactSound(type === 'nuclear');
+  if (navigator.vibrate) {
+    if (type === 'nuclear') {
+      navigator.vibrate([300,60,300,60,700,120,1200,150,700,100,900]);
+    } else {
+      navigator.vibrate([200,50,200,50,500,100,1000]);
+    }
+  }
+}
+function nextTarget() {
+  state.currentTarget++;
+  state.amount = state.mode === 'money' ? 1 : 'bomb';
+  state.tvStatic = 1;
+  state.launched = false;
+  updateUI();
+  updateTargetCounter();
+  if (state.currentTarget >= targets.length) showEndScreen();
+}
+function launch() {
+  if (state.launched) return;
+  state.launched = true;
+  state.trumpAnim = 1;
+  const t = targets[state.currentTarget % targets.length];
+  state.decisions.push({ target: t.name, mode: state.mode, amount: state.amount, icon: t.icon });
+  if (state.mode === 'money') {
+    state.totalMoney += state.amount;
+    playCashSound();
+    spawnMoneyParticles(canvas.width * 0.5, canvas.height * 0.25);
+    document.getElementById('total-money').textContent = state.totalMoney;
+    setTimeout(() => nextTarget(), 1500);
+  } else {
+    state.totalBombs += (state.amount === 'nuclear' ? 10 : 1);
+    document.getElementById('total-bombs').textContent = state.totalBombs;
+    startStrike(state.amount);
+  }
+}
+function toggleMode() {
+  state.mode = state.mode === 'money' ? 'bombs' : 'money';
+  state.amount = state.mode === 'money' ? 1 : 'bomb';
+  playSwitchSound();
+  updateUI();
+}
+function increaseAmount() {
+  if (state.mode === 'money') {
+    state.amount = state.amount === 1 ? 10 : 1;
+  } else {
+    state.amount = state.amount === 'bomb' ? 'nuclear' : 'bomb';
+  }
+  playClick();
+  updateUI();
+}
+function updateUI() {
+  const sw = document.getElementById('btn-switch');
+  const am = document.getElementById('btn-amount');
+  if (state.mode === 'money') {
+    sw.textContent = '💰 DINERO';
+    sw.className = 'game-btn';
+    am.textContent = state.amount === 1 ? '1 BILLÓN' : '10 BILLONES';
+  } else {
+    sw.textContent = '⚠️ ACCIÓN';
+    sw.className = 'game-btn bombs';
+    am.textContent = state.amount === 'bomb' ? 'BOMBA' : 'BOMBA NUCLEAR';
+  }
+}
+function updateTargetCounter() {
+  document.getElementById('target-num').textContent = Math.min(state.currentTarget + 1, targets.length);
+}
+
+// ============ END SCREEN ============
+let endScreenActive = false;
+function showEndScreen() {
+  endScreenActive = true;
+  document.getElementById('ui-overlay').style.display = 'none';
+}
+function drawEndScreen(w, h) {
+  // Dark overlay with gradient
+  const bg = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.6);
+  bg.addColorStop(0, 'rgba(10,5,20,0.95)');
+  bg.addColorStop(1, 'rgba(0,0,0,0.98)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  
+  // Decorative border
+  ctx.strokeStyle = '#c8a432';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(15, 15, w - 30, h - 30);
+  ctx.strokeStyle = 'rgba(200,164,50,0.3)';
+  ctx.strokeRect(20, 20, w - 40, h - 40);
+  
+  // Corner stars
+  const cornerSize = 8;
+  [[25,25],[w-25,25],[25,h-25],[w-25,h-25]].forEach(([x2,y2]) => {
+    drawPixelText('★', x2, y2, cornerSize, '#c8a432');
+  });
+
+  // Title with underline
+  drawPixelText('RESUMEN PRESIDENCIAL', w/2, h * 0.06, Math.min(w * 0.035, 15), '#c8a432');
+  drawPixelRect(w * 0.2, h * 0.06 + 14, w * 0.6, 2, '#c8a432');
+  drawPixelRect(w * 0.25, h * 0.06 + 18, w * 0.5, 1, 'rgba(200,164,50,0.3)');
+  
+  // Stats boxes
+  const boxW = w * 0.35;
+  const boxH = 36;
+  // Money box
+  drawPixelRect(w/2 - boxW - 8, h * 0.10, boxW, boxH, 'rgba(0,255,136,0.06)');
+  ctx.strokeStyle = 'rgba(0,255,136,0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(w/2 - boxW - 8, h * 0.10, boxW, boxH);
+  drawPixelText(`💰 $${state.totalMoney}B`, w/2 - boxW/2 - 8, h * 0.10 + boxH/2, Math.min(w * 0.025, 12), '#00ff88');
+  
+  // Bombs box
+  drawPixelRect(w/2 + 8, h * 0.10, boxW, boxH, 'rgba(255,68,68,0.06)');
+  ctx.strokeStyle = 'rgba(255,68,68,0.3)';
+  ctx.strokeRect(w/2 + 8, h * 0.10, boxW, boxH);
+  drawPixelText(`⚠️ ${state.totalBombs} ACCIONES`, w/2 + boxW/2 + 8, h * 0.10 + boxH/2, Math.min(w * 0.025, 12), '#ff4444');
+
+  // Decisions list
+  const startY = h * 0.24;
+  const lineH = Math.min(h * 0.034, 28);
+  const maxV = Math.floor((h * 0.88 - startY) / lineH);
+
+  state.decisions.forEach((d, i) => {
+    if (i >= maxV) return;
+    const y = startY + i * lineH;
+    const color = d.mode === 'money' ? '#00ff88' : '#ff4444';
+    const bgColor = d.mode === 'money' ? 'rgba(0,255,136,0.03)' : 'rgba(255,68,68,0.03)';
+    const at = d.mode === 'money'
+      ? `$${d.amount}B`
+      : (d.amount === 'bomb' ? 'BOMBA' : 'NUCLEAR');
+    
+    // Row background alternating
+    if (i % 2 === 0) drawPixelRect(w * 0.08, y - lineH/2 + 2, w * 0.84, lineH - 2, bgColor);
+    
+    // Number
+    drawPixelText(`${i + 1}.`, w * 0.12, y, Math.min(w * 0.018, 9), '#666');
+    
+    const icon = d.mode === 'money' ? '💰' : '⚠️';
+    drawPixelText(`${d.icon} ${d.target}: ${icon} ${at}`, w/2, y, Math.min(w * 0.02, 10), color);
+  });
+
+  // Bottom prompt
+  const promptY = h * 0.94;
+  const blink2 = Math.sin(state.time * 3) > 0;
+  if (blink2) {
+    drawPixelText('[ TOCA PARA JUGAR DE NUEVO ]', w/2, promptY, Math.min(w * 0.02, 10), '#888');
+  }
+}
+function resetGame() {
+  state = {
+    mode: 'money', amount: 1, currentTarget: 0,
+    totalMoney: 0, totalBombs: 0, tvStatic: 1,
+    shakeX: 0, shakeY: 0, trumpAnim: 0, launched: false,
+    moneyParticles: [], decisions: [],
+    strikeActive: false, strikeTime: 0, skyRed: 0, strikeType: 'bomb',
+    time: 0,
+    dustMotes: [],
+    chandelierSwing: 0,
+  };
+  for (let i = 0; i < 30; i++) {
+    state.dustMotes.push({
+      x: Math.random(), y: Math.random(),
+      s: 1 + Math.random() * 2, speed: 0.0001 + Math.random() * 0.0003,
+      drift: Math.random() * Math.PI * 2
+    });
+  }
+  shuffleTargets();
+  endScreenActive = false;
+  document.getElementById('ui-overlay').style.display = 'flex';
+  document.getElementById('total-money').textContent = '0';
+  document.getElementById('total-bombs').textContent = '0';
+  updateUI();
+  updateTargetCounter();
+}
+
+// ============ INTRO BACKGROUND ============
+const introCvs = document.getElementById('intro-bg');
+const introCtx = introCvs.getContext('2d');
+let introStars = [];
+function initIntro() {
+  introCvs.width = window.innerWidth;
+  introCvs.height = window.innerHeight;
+  introStars = [];
+  for (let i = 0; i < 80; i++) {
+    introStars.push({
+      x: Math.random() * introCvs.width,
+      y: Math.random() * introCvs.height,
+      s: 1 + Math.random() * 2,
+      speed: 0.2 + Math.random() * 0.5,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+initIntro();
+window.addEventListener('resize', initIntro);
+
+let introRAF;
+function drawIntro(ts) {
+  const t = ts / 1000;
+  const w = introCvs.width, h = introCvs.height;
+  introCtx.fillStyle = '#000';
+  introCtx.fillRect(0, 0, w, h);
+  
+  // Subtle red radial glow
+  const grd = introCtx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.5);
+  grd.addColorStop(0, 'rgba(60,0,0,0.15)');
+  grd.addColorStop(1, 'transparent');
+  introCtx.fillStyle = grd;
+  introCtx.fillRect(0, 0, w, h);
+  
+  // Stars
+  introStars.forEach(s => {
+    const twinkle = 0.3 + Math.sin(t * 2 + s.phase) * 0.5;
+    introCtx.fillStyle = `rgba(255,200,200,${twinkle})`;
+    introCtx.fillRect(s.x, s.y, s.s, s.s);
+    s.y += s.speed;
+    if (s.y > h) { s.y = -2; s.x = Math.random() * w; }
+  });
+  
+  // Pixel grid overlay
+  introCtx.globalAlpha = 0.02;
+  for (let y = 0; y < h; y += 4) {
+    introCtx.fillStyle = '#fff';
+    introCtx.fillRect(0, y, w, 1);
+  }
+  introCtx.globalAlpha = 1;
+  
+  introRAF = requestAnimationFrame(drawIntro);
+}
+introRAF = requestAnimationFrame(drawIntro);
+
+// ============ MAIN RENDER ============
+let lastTime = 0;
+function render(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  state.time += dt;
+
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  if (state.strikeActive) state.strikeTime += dt;
+
+  ctx.save();
+  ctx.translate(state.shakeX, state.shakeY);
+
+  if (endScreenActive) {
+    drawEndScreen(w, h);
+    ctx.restore();
+    requestAnimationFrame(render);
+    return;
+  }
+
+  drawRoom(w, h);
+  
+  // Bookshelf left
+  const bsW = Math.min(w * 0.08, 70);
+  const bsH = Math.min(h * 0.22, 140);
+  drawBookshelf(w * 0.12, h * 0.18, bsW, bsH);
+  
+  // Painting between bookshelf and window
+  drawPainting(w * 0.5, h * 0.14, Math.min(w * 0.08, 60), Math.min(h * 0.1, 50));
+  
+  drawWindow(w, h);
+
+  const tvW = Math.min(w * 0.3, 260), tvH = Math.min(h * 0.28, 200);
+  drawTV(w * 0.5, h * 0.27, tvW, tvH);
+  drawDesk(w * 0.5, h * 0.52, w * 0.45, h * 0.08);
+  drawTrump(w * 0.5, h * 0.57, Math.min(w, h) / 400);
+  drawFlagPole(w * 0.2, h * 0.08, h * 0.48);
+  drawFlagPole(w * 0.8, h * 0.08, h * 0.48);
+  updateParticles();
+
+  // Ambient lighting effect from chandelier
+  ctx.globalAlpha = 0.03 + Math.sin(state.time * 4) * 0.01;
+  const ambGrad = ctx.createRadialGradient(w * 0.5, 60, 0, w * 0.5, 60, w * 0.4);
+  ambGrad.addColorStop(0, '#ffcc44');
+  ambGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = ambGrad;
+  ctx.fillRect(0, 0, w, h * 0.6);
+  ctx.globalAlpha = 1;
+
+  if (state.strikeActive) {
+    const isNuclear = state.strikeType === 'nuclear';
+    if (state.strikeTime >= (isNuclear ? 1.8 : 1.2) && state.strikeTime < (isNuclear ? 2.45 : 1.7)) {
+      const fp = state.strikeTime < (isNuclear ? 2.25 : 1.5)
+        ? 1
+        : 1 - (state.strikeTime - (isNuclear ? 2.25 : 1.5)) / (isNuclear ? 0.2 : 0.2);
+      ctx.fillStyle = `rgba(255,240,200,${fp * (isNuclear ? 0.55 : 0.35)})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+    if (state.strikeTime >= (isNuclear ? 2.25 : 1.5)) {
+      const win = getWin(w, h);
+      const intensity = isNuclear
+        ? (state.strikeTime < 5.5 ? 0.32 : Math.max(0, 0.32 * (1 - (state.strikeTime - 5.5) / 2.0)))
+        : (state.strikeTime < 3.0 ? 0.18 : Math.max(0, 0.18 * (1 - (state.strikeTime - 3.0) / 1.8)));
+      const ag = ctx.createRadialGradient(win.cx, win.cy, 0, win.cx, win.cy, w * (isNuclear ? 0.8 : 0.5));
+      ag.addColorStop(0, `rgba(255,50,0,${intensity})`);
+      ag.addColorStop(1, 'rgba(255,20,0,0)');
+      ctx.fillStyle = ag;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  // Subtle vignette on the whole scene
+  ctx.globalAlpha = 0.3;
+  const sceneVig = ctx.createRadialGradient(w/2, h/2, w * 0.25, w/2, h/2, w * 0.7);
+  sceneVig.addColorStop(0, 'transparent');
+  sceneVig.addColorStop(1, '#000000');
+  ctx.fillStyle = sceneVig;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+  requestAnimationFrame(render);
+}
+
+// ============ EVENTS ============
+document.getElementById('intro-screen').addEventListener('click', () => {
+  initAudio();
+  cancelAnimationFrame(introRAF);
+  document.getElementById('intro-screen').style.display = 'none';
+  document.getElementById('ui-overlay').style.display = 'flex';
+  state.tvStatic = 1;
+  updateTargetCounter();
+  requestAnimationFrame(render);
+});
+
+document.getElementById('btn-switch').addEventListener('click', () => {
+  initAudio();
+  toggleMode();
+});
+document.getElementById('btn-amount').addEventListener('click', () => {
+  initAudio();
+  increaseAmount();
+});
+document.getElementById('btn-launch').addEventListener('click', () => {
+  initAudio();
+  launch();
+});
+
+canvas.addEventListener('click', () => {
+  if (endScreenActive) resetGame();
+});
+
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+</script>
+
+</body>
+</html>
